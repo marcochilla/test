@@ -254,12 +254,13 @@
       return array.sort(() => Math.random() - 0.5);
     }
 
-    async function printQuiz() {
+   async function printQuiz() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   let y = 10;
-  let correctCount = 0;
+
   const allNull = userAnswers.every(ans => ans === null);
+  let correctCount = 0;
 
   selectedQuestions.forEach((q, i) => {
     doc.setFont("helvetica", "normal");
@@ -270,7 +271,7 @@
     const options = shuffle([q.Corretta, q.Falsa1, q.Falsa2, q.Falsa3]);
 
     options.forEach(text => {
-      let prefix = allNull ? '( )' : '   ';
+      let prefix = "   "; // default spacing
 
       if (!allNull) {
         const isChosen = userAnswers[i] === text;
@@ -280,13 +281,15 @@
         } else if (isChosen && text !== q.Corretta) {
           prefix = '✖ ';
         }
+      } else {
+        prefix = '( )'; // test da stampare pulito
       }
 
-      doc.text(`${prefix} ${text}`, 12, y);
+      doc.text(`${prefix}${text}`, 12, y);
       y += 6;
     });
 
-    if (!allNull) {
+    if (!allNull && userAnswers[i]) {
       const feedback = userAnswers[i] === q.Corretta ? "✅ Risposta Corretta" : "❌ Risposta Errata";
       doc.text(feedback, 12, y);
       y += 10;
@@ -304,15 +307,18 @@
   doc.setFontSize(14);
 
   if (allNull) {
-    // SEZIONE RISPOSTE CORRETTE IN FONDO
-    doc.addPage();
-    y = 20;
-    doc.text("🔑 RISPOSTE CORRETTE", 10, y);
+    // Stampa soluzioni subito sotto le domande
+    y += 10;
+    if (y > 260) {
+      doc.addPage();
+      y = 20;
+    }
+    doc.text("🔑 SOLUZIONI CORRETTE", 10, y);
     y += 10;
 
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
     selectedQuestions.forEach((q, i) => {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(12);
       doc.text(`${i + 1}. ${q.Corretta}`, 12, y);
       y += 7;
       if (y > 270) {
