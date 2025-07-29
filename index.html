@@ -1,0 +1,291 @@
+
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>QUIZ</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #f3e7f5, #e3f2fd);
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    h1 { color: #6a1b9a; margin-bottom: 1rem; }
+    #quiz {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      max-width: 800px;
+      width: 100%;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    .question { font-weight: bold; font-size: 1.3rem; margin-bottom: 1rem; }
+    .answers button {
+      display: block; margin: 0.5em 0; padding: 1rem;
+      width: 100%; font-size: 1rem; border-radius: 12px; border: none;
+      background-color: #7e57c2; color: white; cursor: pointer; transition: 0.3s;
+    }
+    .answers button:hover { background-color: #673ab7; }
+    .correct { background-color: #66bb6a !important; }
+    .incorrect { background-color: #ef5350 !important; }
+    .nav, .controls {
+      display: flex; justify-content: space-between; flex-wrap: wrap; margin-top: 1.5rem;
+    }
+    .nav button, .controls button {
+      flex: 1; margin: 0.3rem; padding: 0.8rem;
+      font-size: 1rem; border: none; border-radius: 10px; cursor: pointer;
+    }
+    .feedback { margin-top: 1rem; font-weight: bold; text-align: center; }
+    .progress {
+      margin-bottom: 1rem;
+      text-align: center;
+      font-weight: bold;
+      color: #4a148c;
+    }
+    .result {
+      margin-top: 2rem;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #1b5e20;
+      text-align: center;
+    }
+    #btnFine { background-color: #e53935; color: white; }
+    #btnNuovo { background-color: #fb8c00; color: white; }
+    #btnStampa { background-color: #1e88e5; color: white; }
+    #resultChart {
+      max-width: 400px;
+      margin: 20px auto;
+    }
+    input[type="file"], input[type="number"] {
+      margin-top: 1rem; padding: 0.5rem; font-size: 1rem;
+    }
+    label { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>QUIZ</h1>
+
+ <div id="upload" style="display:none;"></div>
+
+  <div id="start" style="display:none;">
+    <label>Numero di domande: </label>
+    <input type="number" id="numQuestions" min="1" max="50" value="10">
+    <button onclick="startQuiz()">Avvia Test</button>
+  </div>
+
+  <div id="quiz" style="display:none;">
+    <div class="progress" id="progress"></div>
+    <div class="question" id="questionText"></div>
+    <div class="answers" id="answers"></div>
+    <div class="feedback" id="feedback"></div>
+
+    <div class="nav">
+      <button onclick="prevQuestion()">← Indietro</button>
+      <button onclick="nextQuestion()">Avanti →</button>
+    </div>
+
+    <div class="controls">
+      <button id="btnFine" onclick="fineTest()">Fine Test</button>
+      <button id="btnNuovo" onclick="generaNuovoTest()">Genera Nuovo Test</button>
+      <button id="btnStampa" onclick="printQuiz()">Stampa Test</button>
+    </div>
+
+    <div id="result" class="result"></div>
+    <canvas id="resultChart"></canvas>
+  </div>
+
+  <audio id="sound-correct" src="correct.mp3"></audio>
+  <audio id="sound-wrong" src="wrong.mp3"></audio>
+
+  <script>
+    let allQuestions = [], selectedQuestions = [], currentIndex = 0;
+    let userAnswers = [], quizEnded = false;
+
+    window.addEventListener("DOMContentLoaded", function () {
+      fetch('domande.xlsx')
+        .then(res => res.arrayBuffer())
+        .then(data => {
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          allQuestions = XLSX.utils.sheet_to_json(sheet);
+          document.getElementById('upload').style.display = 'none';
+          document.getElementById('start').style.display = 'block';
+        })
+        .catch(err => {
+          alert("Errore nel caricamento del file Excel. Controlla che 'domande.xlsx' sia nel repository.");
+          console.error(err);
+        });
+    });
+
+    function startQuiz() {
+      const n = parseInt(document.getElementById('numQuestions').value);
+      selectedQuestions = allQuestions.sort(() => 0.5 - Math.random()).slice(0, n);
+      userAnswers = Array(n).fill(null);
+      currentIndex = 0;
+      quizEnded = false;
+      document.getElementById('start').style.display = 'none';
+      document.getElementById('quiz').style.display = 'block';
+      document.getElementById('result').textContent = '';
+      document.getElementById('resultChart').style.display = 'none';
+      showQuestion();
+    }
+
+    function showQuestion() {
+      const q = selectedQuestions[currentIndex];
+      const answers = shuffle([q.Corretta, q.Falsa1, q.Falsa2, q.Falsa3]);
+      document.getElementById('progress').textContent = `Domanda ${currentIndex + 1} di ${selectedQuestions.length}`;
+      document.getElementById('questionText').textContent = `${currentIndex + 1}. ${q.Domanda}`;
+      const answersDiv = document.getElementById('answers');
+      answersDiv.innerHTML = '';
+      answers.forEach(a => {
+        const btn = document.createElement('button');
+        btn.textContent = a;
+        if (quizEnded || userAnswers[currentIndex]) {
+          btn.disabled = true;
+          if (a === q.Corretta) btn.classList.add('correct');
+          if (userAnswers[currentIndex] === a && a !== q.Corretta) btn.classList.add('incorrect');
+        } else {
+          btn.onclick = () => handleAnswer(a);
+        }
+        answersDiv.appendChild(btn);
+      });
+      updateFeedback();
+    }
+
+    function handleAnswer(ans) {
+      if (userAnswers[currentIndex]) return;
+      userAnswers[currentIndex] = ans;
+      const q = selectedQuestions[currentIndex];
+      const correct = ans === q.Corretta;
+      const buttons = document.querySelectorAll('#answers button');
+      buttons.forEach(b => {
+        b.disabled = true;
+        if (b.textContent === q.Corretta) b.classList.add('correct');
+        if (b.textContent === ans && !correct) b.classList.add('incorrect');
+      });
+
+      document.getElementById(correct ? "sound-correct" : "sound-wrong").play();
+      updateFeedback();
+
+      if (currentIndex === selectedQuestions.length - 1) {
+        setTimeout(() => {
+          if (confirm("Hai risposto all'ultima domanda. Vuoi terminare il test e vedere il risultato?")) {
+            endQuiz();
+          }
+        }, 400);
+      }
+    }
+
+    function updateFeedback() {
+      const feedback = document.getElementById('feedback');
+      const ans = userAnswers[currentIndex];
+      if (!ans) feedback.textContent = '';
+      else feedback.textContent = ans === selectedQuestions[currentIndex].Corretta ? 'Risposta Corretta' : 'Risposta Errata';
+    }
+
+    function nextQuestion() {
+      if (currentIndex < selectedQuestions.length - 1) {
+        currentIndex++;
+        showQuestion();
+      } else if (currentIndex === selectedQuestions.length - 1 && !quizEnded) {
+        if (confirm("Hai raggiunto l'ultima domanda. Vuoi terminare il test e vedere il risultato?")) {
+          endQuiz();
+        } else {
+          showQuestion();
+        }
+      }
+    }
+
+    function prevQuestion() {
+      if (currentIndex > 0) {
+        currentIndex--;
+        showQuestion();
+      }
+    }
+
+    function endQuiz() {
+      quizEnded = true;
+      let correctCount = userAnswers.reduce((acc, ans, i) =>
+        ans === selectedQuestions[i].Corretta ? acc + 1 : acc, 0);
+
+      document.getElementById('feedback').textContent = '';
+      document.getElementById('result').textContent = `✅ Hai risposto correttamente a ${correctCount} su ${selectedQuestions.length} domande.`;
+
+      const ctx = document.getElementById('resultChart').getContext('2d');
+      document.getElementById('resultChart').style.display = 'block';
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: ['Corrette', 'Errate'],
+          datasets: [{
+            data: [correctCount, selectedQuestions.length - correctCount],
+            backgroundColor: ['#66bb6a', '#ef5350']
+          }]
+        },
+        options: {
+          plugins: {
+            legend: { position: 'bottom' }
+          }
+        }
+      });
+
+      showQuestion();
+    }
+
+    function fineTest() {
+      if (confirm("Sei sicuro di voler terminare e chiudere il quiz?")) {
+        window.close();
+      }
+    }
+
+    function generaNuovoTest() {
+      document.getElementById('start').style.display = 'block';
+      document.getElementById('quiz').style.display = 'none';
+    }
+
+    function shuffle(array) {
+      return array.sort(() => Math.random() - 0.5);
+    }
+
+    async function printQuiz() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      let y = 10;
+      let correctCount = 0;
+      selectedQuestions.forEach((q, i) => {
+        doc.setFontSize(12);
+        doc.text(`${i + 1}. ${q.Domanda}`, 10, y);
+        y += 7;
+        ['Corretta', 'Falsa1', 'Falsa2', 'Falsa3'].forEach(k => {
+          const text = q[k];
+          const isChosen = userAnswers[i] === text;
+          let mark = '[ ]';
+          if (isChosen) {
+            if (text === q.Corretta) {
+              mark = '[V]';
+              correctCount++;
+            } else {
+              mark = '[X]';
+            }
+          }
+          doc.text(`${mark} ${text}`, 12, y);
+          y += 6;
+        });
+        doc.text(userAnswers[i] === q.Corretta ? "Risposta Corretta" : "Risposta Errata", 12, y);
+        y += 10;
+        if (y > 270) { doc.addPage(); y = 10; }
+      });
+      doc.setFontSize(14);
+      doc.text(`Totale risposte corrette: ${correctCount} su ${selectedQuestions.length}`, 10, y + 10);
+      doc.save("quiz_svolto.pdf");
+    }
+  </script>
+</body>
+</html>
