@@ -266,13 +266,13 @@
         ['Corretta', 'Falsa1', 'Falsa2', 'Falsa3'].forEach(k => {
           const text = q[k];
           const isChosen = userAnswers[i] === text;
-          let mark = '[ ]';
-          if (isChosen) {
-            if (text === q.Corretta) {
-              mark = '[V]';
-              correctCount++;
-            } else {
-              mark = '[X]';
+          let mark = '( )';
+		if (isChosen) {
+  			if (text === q.Corretta) {
+    			mark = '(V)';
+    			correctCount++;
+  			} else {
+    			mark = '(X)';
             }
           }
           doc.text(`${mark} ${text}`, 12, y);
