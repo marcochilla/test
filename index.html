@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -100,7 +101,6 @@
     <canvas id="resultChart"></canvas>
   </div>
 
-  <!-- SUONI -->
   <audio id="sound-correct" src="correct.mp3"></audio>
   <audio id="sound-wrong" src="wrong.mp3"></audio>
 
@@ -109,20 +109,20 @@
     let userAnswers = [], quizEnded = false;
 
     window.addEventListener("DOMContentLoaded", function () {
-  fetch('domande.xlsx')
-    .then(res => res.arrayBuffer())
-    .then(data => {
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      allQuestions = XLSX.utils.sheet_to_json(sheet);
-      document.getElementById('upload').style.display = 'none';
-      document.getElementById('start').style.display = 'block';
-    })
-    .catch(err => {
-      alert("Errore nel caricamento del file Excel. Controlla che 'domande.xlsx' sia nel repository.");
-      console.error(err);
+      fetch('domande.xlsx')
+        .then(res => res.arrayBuffer())
+        .then(data => {
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheet = workbook.Sheets[workbook.SheetNames[0]];
+          allQuestions = XLSX.utils.sheet_to_json(sheet);
+          document.getElementById('upload').style.display = 'none';
+          document.getElementById('start').style.display = 'block';
+        })
+        .catch(err => {
+          alert("Errore nel caricamento del file Excel. Controlla che 'domande.xlsx' sia nel repository.");
+          console.error(err);
+        });
     });
-});
 
     function startQuiz() {
       const n = parseInt(document.getElementById('numQuestions').value);
@@ -190,28 +190,27 @@
       else feedback.textContent = ans === selectedQuestions[currentIndex].Corretta ? 'Risposta Corretta' : 'Risposta Errata';
     }
 
-   function nextQuestion() {
-  if (currentIndex < selectedQuestions.length - 1) {
-    currentIndex++;
-    showQuestion();
-  } else if (currentIndex === selectedQuestions.length - 1 && !quizEnded) {
-    // Siamo sull’ultima domanda, chiedi se terminare
-    if (confirm("Hai raggiunto l'ultima domanda. Vuoi terminare il test e vedere il risultato?")) {
-      endQuiz();
-    } else {
-      // Non termina, ma mostra comunque la domanda per mantenere interattività
-      showQuestion();
+    function nextQuestion() {
+      if (currentIndex < selectedQuestions.length - 1) {
+        currentIndex++;
+        showQuestion();
+      } else if (currentIndex === selectedQuestions.length - 1 && !quizEnded) {
+        if (confirm("Hai raggiunto l'ultima domanda. Vuoi terminare il test e vedere il risultato?")) {
+          endQuiz();
+        } else {
+          showQuestion();
+        }
+      }
     }
-  }
-}
-    
-function prevQuestion() {
-  if (currentIndex > 0) {
-    currentIndex--;
-    showQuestion();
-  }
-}
-function endQuiz() {
+
+    function prevQuestion() {
+      if (currentIndex > 0) {
+        currentIndex--;
+        showQuestion();
+      }
+    }
+
+    function endQuiz() {
       quizEnded = true;
       let correctCount = userAnswers.reduce((acc, ans, i) =>
         ans === selectedQuestions[i].Corretta ? acc + 1 : acc, 0);
@@ -219,7 +218,6 @@ function endQuiz() {
       document.getElementById('feedback').textContent = '';
       document.getElementById('result').textContent = `✅ Hai risposto correttamente a ${correctCount} su ${selectedQuestions.length} domande.`;
 
-      // Mostra grafico a torta
       const ctx = document.getElementById('resultChart').getContext('2d');
       document.getElementById('resultChart').style.display = 'block';
       new Chart(ctx, {
@@ -238,7 +236,7 @@ function endQuiz() {
         }
       });
 
-      showQuestion(); // per aggiornare visivamente la domanda finale
+      showQuestion();
     }
 
     function fineTest() {
@@ -257,30 +255,48 @@ function endQuiz() {
     }
 
     async function printQuiz() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      let y = 10;
-      let correctCount = 0;
-      selectedQuestions.forEach((q, i) => {
-        doc.setFontSize(12);
-        doc.text(`${i + 1}. ${q.Domanda}`, 10, y);
-        y += 7;
-        ['Corretta', 'Falsa1', 'Falsa2', 'Falsa3'].forEach(k => {
-          const text = q[k];
-          const isChosen = userAnswers[i] === text;
-          const mark = isChosen ? (text === q.Corretta ? '[✓]' : '[X]') : '[ ]';
-          if (isChosen && text === q.Corretta) correctCount++;
-          doc.text(`${mark} ${text}`, 12, y);
-          y += 6;
-        });
-        doc.text(userAnswers[i] === q.Corretta ? "Risposta Corretta" : "Risposta Errata", 12, y);
-        y += 10;
-        if (y > 270) { doc.addPage(); y = 10; }
-      });
-      doc.setFontSize(14);
-      doc.text(`Totale risposte corrette: ${correctCount} su ${selectedQuestions.length}`, 10, y + 10);
-      doc.save("quiz_svolto.pdf");
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let y = 10;
+  let correctCount = 0;
+
+  selectedQuestions.forEach((q, i) => {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(12);
+    doc.text(`${i + 1}. ${q.Domanda}`, 10, y);
+    y += 7;
+
+    ['Corretta', 'Falsa1', 'Falsa2', 'Falsa3'].forEach(k => {
+      const text = q[k];
+      const isChosen = userAnswers[i] === text;
+      let prefix = "   "; // default indent
+
+      if (isChosen && text === q.Corretta) {
+        prefix = "✔ ";
+        correctCount++;
+      } else if (isChosen && text !== q.Corretta) {
+        prefix = "✖ ";
+      }
+
+      doc.text(`${prefix}${text}`, 12, y);
+      y += 6;
+    });
+
+    const feedback = userAnswers[i] === q.Corretta ? "✅ Risposta Corretta" : "❌ Risposta Errata";
+    doc.text(feedback, 12, y);
+    y += 10;
+
+    if (y > 270) {
+      doc.addPage();
+      y = 10;
     }
+  });
+
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text(`Totale risposte corrette: ${correctCount} su ${selectedQuestions.length}`, 10, y + 10);
+  doc.save("quiz_svolto.pdf");
+}
   </script>
 </body>
 </html>
