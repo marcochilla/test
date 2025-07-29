@@ -254,10 +254,10 @@
       return array.sort(() => Math.random() - 0.5);
     }
 
-   async function printQuiz() {
+  async function printQuiz() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
-  doc.setFont("helvetica", "normal"); // forza font compatibile UTF-8
+  doc.setFont("helvetica", "normal");
   let y = 10;
   let correctCount = 0;
 
@@ -265,24 +265,30 @@
     doc.setFontSize(12);
     doc.text(`${i + 1}. ${q.Domanda}`, 10, y);
     y += 7;
+
     ['Corretta', 'Falsa1', 'Falsa2', 'Falsa3'].forEach(k => {
       const text = q[k];
       const isChosen = userAnswers[i] === text;
+      const isCorrect = text === q.Corretta;
+
       let mark = '[ ]';
-      if (isChosen) {
-        if (text === q.Corretta) {
-          mark = '[V]';
-          correctCount++;
-        } else {
-          mark = '[X]';
-        }
+      if (isChosen && isCorrect) {
+        mark = '[V]';  // scelta corretta
+        correctCount++;
+      } else if (isChosen && !isCorrect) {
+        mark = '[X]';  // scelta errata
+      } else if (!isChosen && isCorrect && userAnswers[i] !== q.Corretta) {
+        mark = '[V]';  // evidenzia la risposta giusta anche se NON scelta
       }
+
       doc.text(`${mark} ${text}`, 12, y);
       y += 6;
     });
+
     const feedback = userAnswers[i] === q.Corretta ? "Risposta corretta" : "Risposta errata";
     doc.text(feedback, 12, y);
     y += 10;
+
     if (y > 270) { doc.addPage(); y = 10; }
   });
 
