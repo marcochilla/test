@@ -254,12 +254,10 @@
       return array.sort(() => Math.random() - 0.5);
     }
 
-   async function printQuiz() {
+    async function printQuiz() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
   let y = 10;
-
-  const allNull = userAnswers.every(ans => ans === null);
   let correctCount = 0;
 
   selectedQuestions.forEach((q, i) => {
@@ -268,34 +266,25 @@
     doc.text(`${i + 1}. ${q.Domanda}`, 10, y);
     y += 7;
 
-    const options = shuffle([q.Corretta, q.Falsa1, q.Falsa2, q.Falsa3]);
+    ['Corretta', 'Falsa1', 'Falsa2', 'Falsa3'].forEach(k => {
+      const text = q[k];
+      const isChosen = userAnswers[i] === text;
+      let prefix = "   "; // default indent
 
-    options.forEach(text => {
-      let prefix = "   "; // default spacing
-
-      if (!allNull) {
-        const isChosen = userAnswers[i] === text;
-        if (isChosen && text === q.Corretta) {
-          prefix = '✔ ';
-          correctCount++;
-        } else if (isChosen && text !== q.Corretta) {
-          prefix = '✖ ';
-        }
-      } else {
-        prefix = '( )'; // test da stampare pulito
+      if (isChosen && text === q.Corretta) {
+        prefix = "✔ ";
+        correctCount++;
+      } else if (isChosen && text !== q.Corretta) {
+        prefix = "✖ ";
       }
 
       doc.text(`${prefix}${text}`, 12, y);
       y += 6;
     });
 
-    if (!allNull && userAnswers[i]) {
-      const feedback = userAnswers[i] === q.Corretta ? "✅ Risposta Corretta" : "❌ Risposta Errata";
-      doc.text(feedback, 12, y);
-      y += 10;
-    } else {
-      y += 10;
-    }
+    const feedback = userAnswers[i] === q.Corretta ? "✅ Risposta Corretta" : "❌ Risposta Errata";
+    doc.text(feedback, 12, y);
+    y += 10;
 
     if (y > 270) {
       doc.addPage();
@@ -303,34 +292,9 @@
     }
   });
 
-  doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-
-  if (allNull) {
-    // Stampa soluzioni subito sotto le domande
-    y += 10;
-    if (y > 260) {
-      doc.addPage();
-      y = 20;
-    }
-    doc.text("🔑 SOLUZIONI CORRETTE", 10, y);
-    y += 10;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    selectedQuestions.forEach((q, i) => {
-      doc.text(`${i + 1}. ${q.Corretta}`, 12, y);
-      y += 7;
-      if (y > 270) {
-        doc.addPage();
-        y = 10;
-      }
-    });
-
-  } else {
-    doc.text(`Totale risposte corrette: ${correctCount} su ${selectedQuestions.length}`, 10, y + 10);
-  }
-
+  doc.setFont("helvetica", "bold");
+  doc.text(`Totale risposte corrette: ${correctCount} su ${selectedQuestions.length}`, 10, y + 10);
   doc.save("quiz_svolto.pdf");
 }
   </script>
